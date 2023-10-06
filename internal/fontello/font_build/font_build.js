@@ -12,15 +12,13 @@
 //
 'use strict';
 
-
 const fontConfig = require('./_lib/config');
 const fontWorker = require('./_lib/worker');
-const crypto     = require('crypto');
-const path       = require('path');
-const os         = require('os');
-const Promise    = require('bluebird');
-const exists     = Promise.promisify(require('level-exists'));
-
+const crypto = require('crypto');
+const path = require('path');
+const os = require('os');
+const Promise = require('bluebird');
+const exists = Promise.promisify(require('level-exists'));
 
 // Returns unique identifier for requested list of glyphs.
 //
@@ -33,13 +31,11 @@ function getFontId(versionHash, config) {
   return hash.digest('hex');
 }
 
-
 module.exports = function (N, apiPath) {
   // Started tasks
   //
   let tasks = {};
   let logger = N.logger.getLogger('font');
-
 
   N.wire.on(apiPath, async function build_font(data) {
     let builderConfig = fontConfig(data.config);
@@ -54,7 +50,6 @@ module.exports = function (N, apiPath) {
     //
     if (await exists(N.downloads, data.fontId)) return;
 
-
     // If task already exists - just return its promise.
     //
     // NOTE: We must do this *after* async `fs.exists` call to prevent creation
@@ -64,7 +59,6 @@ module.exports = function (N, apiPath) {
 
     if (tasks[data.fontId]) return tasks[data.fontId].result;
 
-
     // Otherwise, create a new task.
     //
     let taskInfo = {
@@ -72,7 +66,11 @@ module.exports = function (N, apiPath) {
       clientConfig: data.config,
       builderConfig,
       cwdDir: N.mainApp.root,
-      tmpDir: path.join(os.tmpDir(), 'flutter-icons', `flutter-icons-${data.fontId.substr(0, 8)}`),
+      tmpDir: path.join(
+        os.tmpdir(),
+        'flutter-icons',
+        `flutter-icons-${data.fontId.substr(0, 8)}`
+      ),
       timestamp: Date.now(),
       result: null,
       logger
@@ -82,16 +80,18 @@ module.exports = function (N, apiPath) {
     taskInfo.result = fontWorker(taskInfo);
     // Add to tasks array
     tasks[data.fontId] = taskInfo;
-    logger.info('New job created: %j', { font_id: data.fontId, queue_length: Object.keys(tasks).length });
+    logger.info('New job created: %j', {
+      font_id: data.fontId,
+      queue_length: Object.keys(tasks).length
+    });
 
     // Wait for task finished
     let zipData = await taskInfo.result;
 
-    await N.downloads.put(
-      taskInfo.fontId,
-      zipData,
-      { ttl: 5 * 60 * 1000, valueEncoding: 'binary' }
-    );
+    await N.downloads.put(taskInfo.fontId, zipData, {
+      ttl: 5 * 60 * 1000,
+      valueEncoding: 'binary'
+    });
 
     delete tasks[data.fontId];
   });

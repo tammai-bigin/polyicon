@@ -2,79 +2,141 @@
 //
 'use strict';
 
+const Promise = require('bluebird');
+const _ = require('lodash');
+const path = require('path');
+const mz = require('mz');
+const fs = require('fs');
+const svg2ttf = require('svg2ttf');
+const pug = require('pug');
+// const b64 = require('base64-js');
+const { rimraf } = require('rimraf');
+const mkdirp = require('mkdirp');
+const glob = Promise.promisify(require('glob'));
+const JSZip = require('jszip');
 
-const Promise   = require('bluebird');
-const _         = require('lodash');
-const path      = require('path');
-const mz        = require('mz');
-const fs        = require('fs');
-const svg2ttf   = require('svg2ttf');
-const pug       = require('pug');
-const b64       = require('base64-js');
-const rimraf    = Promise.promisify(require('rimraf'));
-const mkdirp    = require('mkdirp');
-const glob      = Promise.promisify(require('glob'));
-const JSZip     = require('jszip');
-
-
-const TEMPLATES_DIR = path.join(__dirname, '../../../../support/font-templates');
+const TEMPLATES_DIR = path.join(
+  __dirname,
+  '../../../../support/font-templates'
+);
 const TEMPLATES = {};
 //const SVG_FONT_TEMPLATE = _.template(fs.readFileSync(path.join(TEMPLATES_DIR, 'font/svg.tpl'), 'utf8'));
 
-const FLUTTER_FONT_TEMPLATE = _.template(fs.readFileSync(path.join(TEMPLATES_DIR, 'font/flutter_iconset.tpl'), 'utf8'));
-const SVG_FONT_TEMPLATE = _.template(fs.readFileSync(path.join(TEMPLATES_DIR, 'font/svg.tpl'), 'utf8'));
+const FLUTTER_FONT_TEMPLATE = _.template(
+  fs.readFileSync(path.join(TEMPLATES_DIR, 'font/flutter_iconset.tpl'), 'utf8')
+);
+const SVG_FONT_TEMPLATE = _.template(
+  fs.readFileSync(path.join(TEMPLATES_DIR, 'font/svg.tpl'), 'utf8')
+);
 
-const dart_reserved = [ 'abstract', 'deferred', 'if', 'super', 'as ', 'do', 'implements', 'switch', 'assert', 'dynamic',
-    'import', 'sync', 'async', 'else', 'in', 'this', 'enum', 'is', 'throw', 'await', 'export', 'library', 'true',
-    'break', 'external', 'new', 'try', 'case', 'extends', 'null', 'typedef', 'catch', 'factory', 'operator', 'var',
-    'class', 'false', 'part', 'void', 'const', 'final', 'rethrow', 'while', 'continue', 'finally', 'return', 'with',
-    'covariant', 'for', 'set', 'yield', 'default', 'get', 'static', 'yield' ];
+const dart_reserved = [
+  'abstract',
+  'deferred',
+  'if',
+  'super',
+  'as ',
+  'do',
+  'implements',
+  'switch',
+  'assert',
+  'dynamic',
+  'import',
+  'sync',
+  'async',
+  'else',
+  'in',
+  'this',
+  'enum',
+  'is',
+  'throw',
+  'await',
+  'export',
+  'library',
+  'true',
+  'break',
+  'external',
+  'new',
+  'try',
+  'case',
+  'extends',
+  'null',
+  'typedef',
+  'catch',
+  'factory',
+  'operator',
+  'var',
+  'class',
+  'false',
+  'part',
+  'void',
+  'const',
+  'final',
+  'rethrow',
+  'while',
+  'continue',
+  'finally',
+  'return',
+  'with',
+  'covariant',
+  'for',
+  'set',
+  'yield',
+  'default',
+  'get',
+  'static',
+  'yield'
+];
 
-_.forEach({
-  //'demo.pug':              'demo/index.html',
-  //'index.pug':             'index.html',
-  //'bower.pug':             'bower.json',
-  //'css/css.pug':           'css/${FONTNAME}.css',
-  //'css/css-ie7.pug':       'css/${FONTNAME}-ie7.css',
-  //'css/css-codes.pug':     'css/${FONTNAME}-codes.css',
-  //'css/css-ie7-codes.pug': 'css/${FONTNAME}-ie7-codes.css',
-  //'css/css-embedded.pug':  'css/${FONTNAME}-embedded.css',
-  //'LICENSE.pug':           'LICENSE.txt',
-  //'css/animation.css':      'css/animation.css',
-  //'README.txt':             'README.txt'
-}, (outputName, inputName) => {
-  let inputFile = path.join(TEMPLATES_DIR, inputName);
-  let inputData = fs.readFileSync(inputFile, 'utf8');
-  let outputData;
+_.forEach(
+  {
+    //'demo.pug':              'demo/index.html',
+    //'index.pug':             'index.html',
+    //'bower.pug':             'bower.json',
+    //'css/css.pug':           'css/${FONTNAME}.css',
+    //'css/css-ie7.pug':       'css/${FONTNAME}-ie7.css',
+    //'css/css-codes.pug':     'css/${FONTNAME}-codes.css',
+    //'css/css-ie7-codes.pug': 'css/${FONTNAME}-ie7-codes.css',
+    //'css/css-embedded.pug':  'css/${FONTNAME}-embedded.css',
+    //'LICENSE.pug':           'LICENSE.txt',
+    //'css/animation.css':      'css/animation.css',
+    //'README.txt':             'README.txt'
+  },
+  (outputName, inputName) => {
+    let inputFile = path.join(TEMPLATES_DIR, inputName);
+    let inputData = fs.readFileSync(inputFile, 'utf8');
+    let outputData;
 
-  switch (path.extname(inputName)) {
-    case '.pug': // Pug template.
-      outputData = pug.compile(inputData, {
-        pretty: true,
-        filename: inputFile,
-        filters: [ require('jstransformer-stylus') ]
-      });
-      break;
+    switch (path.extname(inputName)) {
+      case '.pug': // Pug template.
+        outputData = pug.compile(inputData, {
+          pretty: true,
+          filename: inputFile,
+          filters: [require('jstransformer-stylus')]
+        });
+        break;
 
-    case '.tpl': // Lodash template.
-      outputData = _.template(inputData);
-      break;
+      case '.tpl': // Lodash template.
+        outputData = _.template(inputData);
+        break;
 
-    default: // Static file - just do a copy.
-      outputData = () => inputData;
-      break;
+      default: // Static file - just do a copy.
+        outputData = () => inputData;
+        break;
+    }
+
+    TEMPLATES[outputName] = outputData;
   }
-
-  TEMPLATES[outputName] = outputData;
-});
-
+);
 
 function buildFlutterConfig(originalBuilderConfig) {
   let flutterBuilderConfig = _.clone(originalBuilderConfig, true);
   for (let i = 0; i < flutterBuilderConfig.glyphs.length; i++) {
     let glyph = flutterBuilderConfig.glyphs[i];
     flutterBuilderConfig.glyphs[i].code16 = glyph.code.toString(16);
-    flutterBuilderConfig.glyphs[i].dart = glyph.css.replace(/[^A-Za-z0-9_]/g, '_');
+    flutterBuilderConfig.glyphs[i].dart = glyph.css.replace(
+      /[^A-Za-z0-9_]/g,
+      '_'
+    );
     if (_.includes(dart_reserved, flutterBuilderConfig.glyphs[i].dart)) {
       flutterBuilderConfig.glyphs[i].dart += '_icon';
     }
@@ -88,31 +150,31 @@ module.exports = async function fontWorker(taskInfo) {
   let fontname = taskInfo.builderConfig.font.fontname;
   let files;
 
-  taskInfo.logger.info(`${logPrefix} Start generation: ${JSON.stringify(taskInfo.clientConfig)}`);
-
+  taskInfo.logger.info(
+    `${logPrefix} Start generation: ${JSON.stringify(taskInfo.clientConfig)}`
+  );
 
   // Collect file paths.
   //
-  let flutter_file = fontname.charAt(0).toLowerCase() + `${fontname}_icons.dart`
-        .slice(1)
-        .replace(/([A-Z])/g, function (m) {
-            return '_' + m.toLowerCase();
-          }
-  );
+  let flutter_file =
+    fontname.charAt(0).toLowerCase() +
+    `${fontname}_icons.dart`.slice(1).replace(/([A-Z])/g, function (m) {
+      return '_' + m.toLowerCase();
+    });
   files = {
-      config: path.join(taskInfo.tmpDir, 'config.json'),
-      //svg:         path.join(taskInfo.tmpDir, 'font', `${fontname}.svg`),
-      ttf: path.join(taskInfo.tmpDir, 'fonts', `${fontname}.ttf`),
-      //ttfUnhinted: path.join(taskInfo.tmpDir, 'font', `${fontname}-unhinted.ttf`),
-      //eot:         path.join(taskInfo.tmpDir, 'font', `${fontname}.eot`),
-      //woff:        path.join(taskInfo.tmpDir, 'font', `${fontname}.woff`),
-      //woff2:       path.join(taskInfo.tmpDir, 'font', `${fontname}.woff2`),
-      //polymer:     path.join(taskInfo.tmpDir, `${fontname}-iconset-svg`, `${fontname}-iconset-svg.html`)
-      //bower:       path.join(taskInfo.tmpDir, 'bower.json'),
-      //demo:        path.join(taskInfo.tmpDir, 'demo', 'index.html'),
-      //polymer:     path.join(taskInfo.tmpDir, `${fontname}-iconset-svg.html`)
-      flutter: path.join(taskInfo.tmpDir, flutter_file)
-    };
+    config: path.join(taskInfo.tmpDir, 'config.json'),
+    //svg:         path.join(taskInfo.tmpDir, 'font', `${fontname}.svg`),
+    ttf: path.join(taskInfo.tmpDir, 'fonts', `${fontname}.ttf`),
+    //ttfUnhinted: path.join(taskInfo.tmpDir, 'font', `${fontname}-unhinted.ttf`),
+    //eot:         path.join(taskInfo.tmpDir, 'font', `${fontname}.eot`),
+    //woff:        path.join(taskInfo.tmpDir, 'font', `${fontname}.woff`),
+    //woff2:       path.join(taskInfo.tmpDir, 'font', `${fontname}.woff2`),
+    //polymer:     path.join(taskInfo.tmpDir, `${fontname}-iconset-svg`, `${fontname}-iconset-svg.html`)
+    //bower:       path.join(taskInfo.tmpDir, 'bower.json'),
+    //demo:        path.join(taskInfo.tmpDir, 'demo', 'index.html'),
+    //polymer:     path.join(taskInfo.tmpDir, `${fontname}-iconset-svg.html`)
+    flutter: path.join(taskInfo.tmpDir, flutter_file)
+  };
 
   // Generate initial SVG font.
   //
@@ -120,7 +182,9 @@ module.exports = async function fontWorker(taskInfo) {
   let svgOutput = SVG_FONT_TEMPLATE(taskInfo.builderConfig);
 
   // Generate Flutter ttf and dart
-  let flutterOutput = FLUTTER_FONT_TEMPLATE(buildFlutterConfig(taskInfo.builderConfig));
+  let flutterOutput = FLUTTER_FONT_TEMPLATE(
+    buildFlutterConfig(taskInfo.builderConfig)
+  );
 
   // Prepare temporary working directory.
   //
@@ -131,7 +195,6 @@ module.exports = async function fontWorker(taskInfo) {
   //yield mkdirp(path.join(taskInfo.tmpDir, 'css'));
   // yield mkdirp(path.join(taskInfo.tmpDir, `${fontname}-iconset-svg`));
 
-
   // Write clinet config and initial SVG font.
   //
   let configOutput = JSON.stringify(taskInfo.clientConfig, null, '  ');
@@ -141,13 +204,13 @@ module.exports = async function fontWorker(taskInfo) {
   // yield mz.fs.writeFile(files.polymer, polymerOutput, 'utf8');
   await mz.fs.writeFile(files.flutter, flutterOutput, 'utf8');
 
-
   // Convert SVG to TTF
   //
-  let ttf = svg2ttf(svgOutput, { copyright: taskInfo.builderConfig.font.copyright });
+  let ttf = svg2ttf(svgOutput, {
+    copyright: taskInfo.builderConfig.font.copyright
+  });
 
   await mz.fs.writeFile(files.ttf, ttf.buffer);
-
 
   // Autohint the resulting TTF.
   //
@@ -171,18 +234,15 @@ module.exports = async function fontWorker(taskInfo) {
   //   await mz.fs.unlink(files.ttfUnhinted);
   // }
 
-
   // Read the resulting TTF to produce EOT and WOFF.
   //
   //let ttfOutput = new Uint8Array(await mz.fs.readFile(files.ttf));
-
 
   // Convert TTF to EOT.
   //
   //let eotOutput = ttf2eot(ttfOutput).buffer;
 
   //await mz.fs.writeFile(files.eot, eotOutput);
-
 
   // Convert TTF to WOFF.
   //
@@ -196,7 +256,6 @@ module.exports = async function fontWorker(taskInfo) {
 
   // await mz.fs.writeFile(files.woff2, woff2Output);
 
-
   // Write template files. (generate dynamic and copy static)
   //
   let templatesNames = Object.keys(TEMPLATES);
@@ -206,7 +265,10 @@ module.exports = async function fontWorker(taskInfo) {
     let templateData = TEMPLATES[templateName];
 
     // don't create license file when no copyright data exists
-    if ((templateName === 'LICENSE.txt') && (!taskInfo.builderConfig.fonts_list.length)) {
+    if (
+      templateName === 'LICENSE.txt' &&
+      !taskInfo.builderConfig.fonts_list.length
+    ) {
       continue;
     }
 
@@ -215,8 +277,8 @@ module.exports = async function fontWorker(taskInfo) {
     let outputData = templateData(taskInfo.builderConfig);
 
     //outputData = outputData
-                    //.replace('%WOFF64%', b64.fromByteArray(woffOutput))
-                    //.replace('%TTF64%', b64.fromByteArray(ttfOutput));
+    //.replace('%WOFF64%', b64.fromByteArray(woffOutput))
+    //.replace('%TTF64%', b64.fromByteArray(ttfOutput));
 
     await mz.fs.writeFile(outputFile, outputData, 'utf8');
   }
@@ -225,16 +287,23 @@ module.exports = async function fontWorker(taskInfo) {
   // Create zipball.
   //
 
-  let archiveFiles = await glob(path.join(taskInfo.tmpDir, '**'), { nodir: true });
+  let archiveFiles = await glob(path.join(taskInfo.tmpDir, '**'), {
+    nodir: true
+  });
   let zip = new JSZip();
 
   for (var i = 0; i < archiveFiles.length; i++) {
     let fileData = await mz.fs.readFile(archiveFiles[i]);
 
-    zip.folder(path.basename(taskInfo.tmpDir)).file(path.relative(taskInfo.tmpDir, archiveFiles[i]), fileData);
+    zip
+      .folder(path.basename(taskInfo.tmpDir))
+      .file(path.relative(taskInfo.tmpDir, archiveFiles[i]), fileData);
   }
 
-  let zipData = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
+  let zipData = await zip.generateAsync({
+    type: 'nodebuffer',
+    compression: 'DEFLATE'
+  });
 
   // TODO: force tmp dir cleanup on fail
 
@@ -242,13 +311,14 @@ module.exports = async function fontWorker(taskInfo) {
   //
   await rimraf(taskInfo.tmpDir);
 
-
   // Done.
   //
   let timeEnd = Date.now();
 
-  taskInfo.logger.info(`${logPrefix} Generated in ${(timeEnd - timeStart) / 1000} ` +
-                       `(real: ${(timeEnd - taskInfo.timestamp) / 1000})`);
+  taskInfo.logger.info(
+    `${logPrefix} Generated in ${(timeEnd - timeStart) / 1000} ` +
+      `(real: ${(timeEnd - taskInfo.timestamp) / 1000})`
+  );
 
   return zipData;
 };

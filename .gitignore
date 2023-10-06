@@ -13,3 +13,5 @@ db/
 .fontello
 .fontello.zip
 .fontello.src
+
+.DS_Store

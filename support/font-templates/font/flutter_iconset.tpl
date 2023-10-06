@@ -17,6 +17,8 @@
 ///         License:   ${info.meta.license} (${info.meta.license_url})
 ///         Homepage:  ${info.meta.homepage}<% }); %>
 ///
+// ignore_for_file: constant_identifier_names
+
 import 'package:flutter/widgets.dart';
 
 class ${font.fontname} {
@@ -26,4 +28,14 @@ class ${font.fontname} {
   static const String? _kFontPkg = null;
 <% glyphs.forEach(function(glyph) { %>
   static const IconData ${glyph.dart} = IconData(0x${glyph.code16}, fontFamily: _kFontFam, fontPackage: _kFontPkg);<% }); %>
+
+  static const _kIconCodes = {
+<% glyphs.forEach(function(glyph) { %>'${glyph.dart}': 0x${glyph.code16},<% }); %>
+  };
+
+  static getIconByName(String name) => IconData(
+        _kIconCodes[name] ?? _kIconCodes.entries.first.value,
+        fontFamily: _kFontFam,
+        fontPackage: _kFontPkg,
+      );
 }
